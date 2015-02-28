@@ -3,9 +3,10 @@
 
 #include <vector>
 #include <mutex>
+#include "Queue.hpp"
 
 template <class T>
-class RegularQueue {
+class RegularQueue : public Queue<T> {
     unsigned long count;
     unsigned long empty;
     std::vector<T> items;

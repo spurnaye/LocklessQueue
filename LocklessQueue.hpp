@@ -7,11 +7,13 @@
 #include <utility>
 #include <exception>
 #include "LocklessSemaphore.hpp"
+#include "Queue.hpp"
 
 template <class T>
-class LocklessQueue {
+class LocklessQueue : public Queue<T> {
     LocklessSemaphore count_sem;
     LocklessSemaphore empty_sem;
+    std::vector<std::atomic<bool>> full_signal;
 //    std::vector<LocklessSemaphore> sems;
     std::vector<T> items;
     std::atomic<size_t> capacity;

@@ -6,50 +6,72 @@
 #include <string>
 #include <cassert>
 #include <unistd.h>
+#include <string.h>
 #include "LocklessQueue.hpp"
 #include "RegularQueue.hpp"
 #include "ShutdownException.hpp"
 
 
 #define COUNT 10000000
-int x[COUNT];
+std::atomic<int> x[COUNT];
 
-void enqueue_count(LocklessQueue<int>* q) {
-    try {
-        for(int i = 0; i < COUNT; i++) {
-            q->enqueue(i);
+void clear_x();
+void test_queue(Queue<int> &q, std::string q_name);
+
+int main(void) {
+    std::cout << "Testing queueing and dequeueing of " << COUNT
+              << " integers using 4 threads. 2 queueing and 2 dequeueing."
+              << std::endl << std::endl;
+    LocklessQueue<int> lq(COUNT/2, 2);
+    RegularQueue<int> rq(COUNT/2);
+
+    test_queue(lq, "lockless queue");
+    std::cout << std::endl;
+    clear_x();
+    test_queue(rq, "locking queue");
+}
+
+
+uint64_t ms_since_epoch();
+void enqueue_count(Queue<int>* q);
+void dequeue_count(Queue<int>* q);
+void verify_x();
+
+void test_queue(Queue<int> &q, std::string q_name) {
+    std::cout << "Starting " << q_name << "." << std::endl;
+    uint64_t start = ms_since_epoch();
+    auto put = std::thread(enqueue_count, &q);
+    auto put2 = std::thread(enqueue_count, &q);
+    auto get = std::thread(dequeue_count, &q);
+    auto get2 = std::thread(dequeue_count, &q);
+    
+    put.join();
+    put2.join();
+    get.join();
+    get2.join();
+    
+    uint64_t end = ms_since_epoch();
+    std::cout << "Done. " << q_name << " took: "
+              << end - start << "ms." << std::endl;
+    verify_x();
+}
+
+void clear_x() {
+    memset(&x, 0, COUNT * sizeof(x[0]));
+}
+
+void verify_x() {
+    std::cout << "Verifying correctness." << std::endl;
+    bool ok = true;
+    for(int i = 0; i < COUNT; i++) {
+        if(x[i] != 2) {
+            std::cout << "x[" << i << "] == " << x[i] << std::endl;
+            ok = false;
         }
-    } catch (ShutdownException e) {
-        std::cout << "enqueue Got shutdown exception." << std::endl;
     }
-}
-
-void dequeue_count(LocklessQueue<int>* q) {
-    try {
-        for(int i = 0; i < COUNT * 2; i++) {
-            int qx = q->dequeue();
-            x[qx]++;
-        }
-    } catch (ShutdownException e) {
-        std::cout << "dequeue Got shutdown exception." << std::endl;
+    if(ok) {
+        std::cout << "Queue functioned correctly." << std::endl;
     }
-}
-
-void reg_enqueue_count(RegularQueue<int>* q) {
-    try {
-        for(int i = 0; i < COUNT; i++) {
-            q->enqueue(i);
-        }
-    } catch (ShutdownException e) {}
-}
-
-void reg_dequeue_count(RegularQueue<int>* q) {
-    try {
-        for(int i = 0; i < COUNT * 2; i++) {
-            int qx = q->dequeue();
-            x[qx]++;
-        }
-    } catch (ShutdownException e) {}
 }
 
 uint64_t ms_since_epoch() {
@@ -60,81 +82,23 @@ uint64_t ms_since_epoch() {
     } catch (ShutdownException e) {}
 }
 
-int main(void) {
-
-    std::cout << "Lockless Semaphore Size: " << sizeof(LocklessSemaphore) << std::endl;
-        std::cout << "Semphore Size: " << sizeof(Semaphore) << std::endl;
-    
-    {
-        LocklessQueue<int> q(COUNT/2, 2);
-        
-        uint64_t start = ms_since_epoch();
-//        auto put = std::async(std::launch::async,
-//                              enqueue_count, &q);
-//        auto put2 = std::async(std::launch::async,
-//                               enqueue_count, &q);
-//        auto get = std::async(std::launch::async,
-//                              dequeue_count, &q);
-//        auto get2 = std::async(std::launch::async,
-//                               dequeue_count, &q);
-
-        auto put = std::thread(enqueue_count, &q);
-        auto put2 = std::thread(enqueue_count, &q);
-        auto get = std::thread(dequeue_count, &q);
-//        auto get2 = std::thread(dequeue_count, &q);
-
-//        get.detach();
-//        get2.detach();
-        
-        put.join();
-        put2.join();
-        uint64_t end = ms_since_epoch();
-        std::cout << "Done. Lockless took: " << end - start << "ms." << std::endl;
-
-        sleep(1);
-//        q.shutdown();
-        get.detach();
-//        get2.detach();
-//        get.join();
-//        get2.join();
-        
-        // Verify correct counts
-//        for(int i = 0; i < COUNT; i++) {
-//            std::cout << x[i] << ",";
-//        }
-        std::cout << std::endl;
+void enqueue_count(Queue<int>* q) {
+    try {
         for(int i = 0; i < COUNT; i++) {
-            if(x[i] != 2) {
-                std::cout << "x[" << i << "] == " << x[i] << std::endl;
-//                exit(0);
-            }
+            q->enqueue(i);
         }
+    } catch (ShutdownException e) {
+        std::cout << "enqueue Got shutdown exception." << std::endl;
     }
+}
 
-//    {
-//        RegularQueue<int> q(200);
-//        
-//        std::cout << "Starting regular queue." << std::endl;
-//        uint64_t start = ms_since_epoch();
-//        auto put = std::async(std::launch::async,
-//                              reg_enqueue_count, &q);
-//        auto put2 = std::async(std::launch::async,
-//                               reg_enqueue_count, &q);
-//        auto get = std::async(std::launch::async,
-//                              reg_dequeue_count, &q);
-//        auto get2 = std::async(std::launch::async,
-//                               reg_dequeue_count, &q);
-//        
-//        put.get();
-//        put2.get();
-//        uint64_t end = ms_since_epoch();
-//        std::cout << "Done. Regular took: " << end - start << "ms." << std::endl;
-//        // Verify correct counts
-//        for(int i = 0; i < COUNT; i++) {
-//            if(x[i] != 2) {
-//                std::cout << "x[" << i << "] != 2" << std::endl;
-//                exit(0);
-//            }
-//        }
-//    }
+void dequeue_count(Queue<int>* q) {
+    try {
+        for(int i = 0; i < COUNT; i++) {
+            int qx = q->dequeue();
+            x[qx]++;
+        }
+    } catch (ShutdownException e) {
+        std::cout << "dequeue Got shutdown exception." << std::endl;
+    }
 }

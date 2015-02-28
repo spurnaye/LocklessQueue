@@ -9,7 +9,7 @@ LocklessQueue<T>::LocklessQueue(size_t n)
 
 template <class T>
 LocklessQueue<T>::LocklessQueue(size_t n, size_t max)
-    :items(n), capacity(n), head(0), tail(0),
+    :items(n), full_signal(n), capacity(n), head(0), tail(0),
      count_sem(0), empty_sem(n), max_size(max),
      is_shutdown(false) {}
 
@@ -38,8 +38,13 @@ void LocklessQueue<T>::enqueue(T x) {
             t = std::atomic_load(&tail);
             c = std::atomic_load(&capacity);
         }while(!std::atomic_compare_exchange_weak(&head, &h, (h + 1) % c));
+
+        // Wait for our spot to be empty.
+        while(full_signal[h].load());
+
         items[h] = x;
-        //sems[h].post();
+        
+        full_signal[h].store(true);
         count_sem.post(); 
     }
     else {
@@ -54,19 +59,22 @@ T LocklessQueue<T>::dequeue() {
         throw ShutdownException();
     }
     long w = count_sem.wait();
-//    executing_threads++;
     size_t h,t,c;
-    volatile T ret;
-    int i = 0;
     do {
         h = std::atomic_load(&head);
         t = std::atomic_load(&tail);
         c = std::atomic_load(&capacity);
-        ret = items[t];
-        i++;
     }while(!std::atomic_compare_exchange_weak(&tail, &t, (t + 1) % c));
-    //sems[t].wait();
-    //ret = items[t];
+
+    // Wait for full flag, then load ret.
+    while(!full_signal[t].load());
+    T ret = items[t];
+
+    // Flip full flag back to empty.
+//    bool expected = true;
+//    while(!std::atomic_compare_exchange_weak(&full_signal[t], expected, false));
+    full_signal[t].store(false);
+    
     items[t] = 0;
     empty_sem.post();
     return ret;
