@@ -11,11 +11,9 @@ void RegularQueue<T>::enqueue(T x) {
     }
     items[head] = x;
     head = (head + 1) % items.size();
-//    std::cout << "Set head to : " << head;
     count++;
     empty--;
     enqueue_event.notify_one();
-//    std::cout << "Enqueueing" << std::endl;
 }
 
 template <class T>
@@ -29,6 +27,5 @@ T RegularQueue<T>::dequeue() {
     count--;
     empty++;
     dequeue_event.notify_one();
-//    std::cout << "Dequeueing" << std::endl;
     return ret;
 }

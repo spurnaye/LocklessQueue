@@ -22,13 +22,13 @@ int main(void) {
     std::cout << "Testing queueing and dequeueing of " << COUNT
               << " integers using 4 threads. 2 queueing and 2 dequeueing."
               << std::endl << std::endl;
-    LocklessQueue<int> lq(COUNT/2, 2);
+    LocklessQueue<int> lq(2000, 200); //COUNT/2);
     RegularQueue<int> rq(COUNT/2);
 
     test_queue(lq, "lockless queue");
-    std::cout << std::endl;
-    clear_x();
-    test_queue(rq, "locking queue");
+//    std::cout << std::endl;
+//    clear_x();
+//    test_queue(rq, "locking queue");
 }
 
 
@@ -85,6 +85,7 @@ uint64_t ms_since_epoch() {
 void enqueue_count(Queue<int>* q) {
     try {
         for(int i = 0; i < COUNT; i++) {
+//            std::cout << "Enqueueing." << std::endl;
             q->enqueue(i);
         }
     } catch (ShutdownException e) {
@@ -96,6 +97,7 @@ void dequeue_count(Queue<int>* q) {
     try {
         for(int i = 0; i < COUNT; i++) {
             int qx = q->dequeue();
+            // std::cout << "Dequeueing " << qx << std::endl;
             x[qx]++;
         }
     } catch (ShutdownException e) {

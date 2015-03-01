@@ -9,7 +9,8 @@ LocklessQueue<T>::LocklessQueue(size_t n)
 
 template <class T>
 LocklessQueue<T>::LocklessQueue(size_t n, size_t max)
-    :items(n), full_signal(n), capacity(n), head(0), tail(0),
+    :items(n), full_signal(new std::vector<std::atomic<bool>>(n)),
+     capacity(n), head(0), tail(0),
      count_sem(0), empty_sem(n), max_size(max),
      is_shutdown(false) {}
 
@@ -27,6 +28,7 @@ void LocklessQueue<T>::shutdown() {
 
 template <class T>
 void LocklessQueue<T>::enqueue(T x) {
+    //std::cout << "Empty: " << empty_sem.current() << std::endl;
     if(is_shutdown.load()) {
         throw ShutdownException();
     }
@@ -37,15 +39,18 @@ void LocklessQueue<T>::enqueue(T x) {
             h = std::atomic_load(&head);
             t = std::atomic_load(&tail);
             c = std::atomic_load(&capacity);
+//            std::cout << "Spinning enqueue." << std::endl;
         }while(!std::atomic_compare_exchange_weak(&head, &h, (h + 1) % c));
 
+//        std::cout << "Waiting for our spot to be empty." << std::endl;
         // Wait for our spot to be empty.
-        while(full_signal[h].load());
+        while((*full_signal)[h].load());
 
         items[h] = x;
         
-        full_signal[h].store(true);
+        (*full_signal)[h].store(true);
         count_sem.post(); 
+//        std::cout << "Done Enqueueing." << std::endl;
     }
     else {
         expand();
@@ -55,6 +60,7 @@ void LocklessQueue<T>::enqueue(T x) {
 
 template <class T>
 T LocklessQueue<T>::dequeue() {
+//    std::cout << "Full: " << count_sem.current() << std::endl;
     if(is_shutdown.load()) {
         throw ShutdownException();
     }
@@ -64,18 +70,17 @@ T LocklessQueue<T>::dequeue() {
         h = std::atomic_load(&head);
         t = std::atomic_load(&tail);
         c = std::atomic_load(&capacity);
+//        std::cout << "Dequeue Spinning." << std::endl;
     }while(!std::atomic_compare_exchange_weak(&tail, &t, (t + 1) % c));
 
     // Wait for full flag, then load ret.
-    while(!full_signal[t].load());
+    while(!(*full_signal)[t].load());
     T ret = items[t];
 
     // Flip full flag back to empty.
-//    bool expected = true;
-//    while(!std::atomic_compare_exchange_weak(&full_signal[t], expected, false));
-    full_signal[t].store(false);
+    (*full_signal)[t].store(false);
     
-    items[t] = 0;
+    items[t] = T();
     empty_sem.post();
     return ret;
 }
@@ -106,12 +111,12 @@ void LocklessQueue<T>::fill_semaphores(std::pair<long, long> &p) {
 
 template <class T>
 void LocklessQueue<T>::expand() {
-    std::cout << "Expanding!" << std::endl;
+//    std::cout << "Expanding!" << std::endl;
     std::unique_lock<std::mutex> lock(expand_lock);
 
     size_t quarter_cap = capacity.load()/4;
     size_t e = empty_sem.current();
-
+//    std::cout << "Expanding." << std::endl;
     if(e < std::max(quarter_cap, (size_t)1)) {
         long count = 0;
         long empty = 0;
@@ -119,6 +124,7 @@ void LocklessQueue<T>::expand() {
         auto pair = drain_semaphores();
         count = pair.first;
         empty = pair.second;
+//        sleep(5);
                 
         size_t cap = capacity.load();
         size_t newcapacity = cap * 2;
@@ -128,20 +134,40 @@ void LocklessQueue<T>::expand() {
             return;
         }
 
+        std::cout << "Expanding to: " << newcapacity << std::endl;
+        for(size_t i = 0; i < items.size(); i++) {
+            std::cout << (*full_signal)[i].load() << ",";
+        }
+        std::cout << " -> ";
+        
         items.resize(newcapacity);
+        auto new_signal = new std::vector<std::atomic<bool>>(newcapacity);
+        for(size_t i = 0; i < cap; i++) {
+            (*new_signal)[i].store((*full_signal)[i].load());
+        }
+        delete full_signal;
+        full_signal = new_signal;
         empty += cap;
         
         if(head <= tail) {
             for(size_t i = tail; i < cap; i++) {
                 size_t dist_from_end = (cap - i);
                 items[newcapacity - dist_from_end] = items[i];
+                (*full_signal)[newcapacity - dist_from_end].store((*full_signal)[i].load());
                 items[i] = T();
+                (*full_signal)[i].store(false);
             }
             tail = newcapacity - (cap - tail);
         }
         capacity.store(newcapacity);
+
+        for(size_t i = 0; i < items.size(); i++) {
+            std::cout << (*full_signal)[i].load() << ",";
+        }
+        std::cout << std::endl;
         
         pair.second = empty;
         fill_semaphores(pair);
+//        std::cout << "Done." << std::endl;
     }
 }

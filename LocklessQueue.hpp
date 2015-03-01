@@ -8,13 +8,13 @@
 #include <exception>
 #include "LocklessSemaphore.hpp"
 #include "Queue.hpp"
+#include "CopyableAtomic.hpp"
 
 template <class T>
 class LocklessQueue : public Queue<T> {
     LocklessSemaphore count_sem;
     LocklessSemaphore empty_sem;
-    std::vector<std::atomic<bool>> full_signal;
-//    std::vector<LocklessSemaphore> sems;
+    std::vector<std::atomic<bool>> *full_signal;
     std::vector<T> items;
     std::atomic<size_t> capacity;
     std::atomic<size_t> head; // Items are queued on head. (back of vector)
