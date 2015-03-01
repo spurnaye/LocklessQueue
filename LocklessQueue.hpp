@@ -8,7 +8,6 @@
 #include <exception>
 #include "LocklessSemaphore.hpp"
 #include "Queue.hpp"
-#include "CopyableAtomic.hpp"
 
 template <class T>
 class LocklessQueue : public Queue<T> {
