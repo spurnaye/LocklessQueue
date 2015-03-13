@@ -30,39 +30,33 @@ int main(void) {
     for(int i = 0; i < 20; i++) { 
         LocklessQueue<int> lq(2, COUNT/2);
         test_queue(lq, "lockless queue");
-        verify_x(1);
+        verify_x(2);
         clear_x();
     }
    
-    // verify_x();
-    //std::cout << std::endl;
-    //clear_x();
+
     for(int i = 0; i < 20; i++) {
         RegularQueue<int> rq(COUNT/2);
         test_queue(rq, "locking queue");
-        verify_x(1);
+        verify_x(2);
         clear_x();
     }
-//verify_x();
 }
 
 void test_queue(Queue<int> &q, std::string q_name) {
     std::cout << "Starting " << q_name << "." << std::endl;
     uint64_t start = ms_since_epoch();
     auto put = std::thread(enqueue_count, &q);
-//    auto put2 = std::thread(enqueue_count, &q);
-//    auto put3 = std::thread(enqueue_count, &q);
-//    sleep(5);
+    auto put2 = std::thread(enqueue_count, &q);
+
     auto get = std::thread(dequeue_count, &q);
-//    auto get2 = std::thread(dequeue_count, &q);
-//    auto get3 = std::thread(dequeue_count, &q);
+    auto get2 = std::thread(dequeue_count, &q);
     
     put.join();
-//    put2.join();
-//    put3.join();
+    put2.join();
+
     get.join();
-//    get2.join();
-//    get3.join();
+    get2.join();
     
     uint64_t end = ms_since_epoch();
     std::cout << "Done. " << q_name << " took: "
