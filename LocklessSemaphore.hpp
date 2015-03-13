@@ -7,7 +7,6 @@
 class LocklessSemaphore {
     std::atomic<long> capacity;
     Semaphore sem;
-    unsigned long spinCount;
     
 public:
     LocklessSemaphore() : LocklessSemaphore(0) {}
@@ -18,9 +17,6 @@ public:
     long wait();
     bool try_wait();
     void shutdown();
-
-    void setSpinCount(unsigned long spinCount);
-    unsigned long getSpinCount();
 
 };
 
