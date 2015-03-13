@@ -7,4 +7,4 @@ all:
 	$(CXX) $(CXXFLAGS) $(LFLAGS) main_test.cpp LocklessSemaphore.cpp Semaphore.cpp -o $(BINARY)
 
 clean:
-	~@rm $(BINARY)
+	-@rm $(BINARY)
