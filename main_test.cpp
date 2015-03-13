@@ -12,7 +12,7 @@
 #include "ShutdownException.hpp"
 
 
-#define COUNT 10000000
+#define COUNT 100000000
 std::atomic<int> x[COUNT];
 
 void clear_x();
@@ -22,7 +22,7 @@ int main(void) {
     std::cout << "Testing queueing and dequeueing of " << COUNT
               << " integers using 4 threads. 2 queueing and 2 dequeueing."
               << std::endl << std::endl;
-    LocklessQueue<int> lq(COUNT/2, 2);
+    LocklessQueue<int> lq(COUNT/2);
     RegularQueue<int> rq(COUNT/2);
 
     test_queue(lq, "lockless queue");
@@ -42,6 +42,7 @@ void test_queue(Queue<int> &q, std::string q_name) {
     uint64_t start = ms_since_epoch();
     auto put = std::thread(enqueue_count, &q);
     auto put2 = std::thread(enqueue_count, &q);
+//    sleep(5);
     auto get = std::thread(dequeue_count, &q);
     auto get2 = std::thread(dequeue_count, &q);
     

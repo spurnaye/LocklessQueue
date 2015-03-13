@@ -2,7 +2,7 @@
 #include <iostream>
 
 LocklessSemaphore::LocklessSemaphore(int initial_capacity)
-    : capacity(initial_capacity), sem(0) {}
+    : capacity(initial_capacity), sem(0), spinCount(0) {}
 
 LocklessSemaphore::~LocklessSemaphore() {
 
@@ -25,6 +25,9 @@ void LocklessSemaphore::post() {
 }
 
 long LocklessSemaphore::wait() {
+    int spin = 0;
+    while(capacity.load() <= 0 && spin++ < spinCount);
+    
     long cap = capacity--;
     if(cap <= 0) {
 //        std::cout << "Waiting." << std::endl;
@@ -43,4 +46,12 @@ bool LocklessSemaphore::try_wait() {
     }while(!atomic_compare_exchange_weak(&capacity, &cap, cap - 1));
     //std::cout << "Doing try_wait." << std::endl;
     return true;
+}
+
+void LocklessSemaphore::setSpinCount(unsigned long spinCount) {
+    this->spinCount = spinCount;
+}
+
+unsigned long LocklessSemaphore::getSpinCount() {
+    return spinCount;
 }
